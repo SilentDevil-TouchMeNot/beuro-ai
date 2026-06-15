@@ -1,0 +1,51 @@
+# ── Python compiled files ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# ── Virtual environment ──────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Environment / secrets  ← MOST IMPORTANT ─────────────────
+.env
+.env.local
+.env.production
+*.env
+
+# ── Session data (personal user data — never push) ──────────
+data/sessions/
+data/*.json
+
+# ── macOS system files ───────────────────────────────────────
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Downloaded PDFs / forms ──────────────────────────────────
+*.pdf
+*.docx
+downloads/
+
+# ── Old / replaced files (Streamlit era) ─────────────────────
+frontend/app.py

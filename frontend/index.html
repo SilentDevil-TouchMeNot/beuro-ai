@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beuro AI – Government Service Autopilot</title>
+  <meta name="description" content="AI-powered assistant to navigate Indian government bureaucracy seamlessly with voice, multilingual support, and step-by-step guidance." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ============================================================
+       RESET & TOKENS
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c14;
+      --bg2:       #0d1422;
+      --glass:     rgba(255,255,255,0.06);
+      --glass-b:   rgba(255,255,255,0.12);
+      --border:    rgba(255,255,255,0.10);
+      --accent:    #4f8ef7;
+      --accent2:   #a78bfa;
+      --success:   #34d399;
+      --warning:   #fbbf24;
+      --text:      #e2e8f0;
+      --text-muted:#7e8fa8;
+      --user-msg:  linear-gradient(135deg,#4f8ef7,#7c3aed);
+      --bot-msg:   rgba(255,255,255,0.07);
+      --radius:    16px;
+      --shadow:    0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ============================================================
+       ANIMATED BACKGROUND
+       ============================================================ */
+    .bg-orbs {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    }
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.35;
+      animation: float 10s ease-in-out infinite alternate;
+    }
+    .orb1 { width:500px; height:500px; top:-150px; left:-150px; background:radial-gradient(circle,#3b82f6,transparent 70%); }
+    .orb2 { width:400px; height:400px; bottom:-100px; right:-100px; background:radial-gradient(circle,#8b5cf6,transparent 70%); animation-delay:-4s; }
+    .orb3 { width:300px; height:300px; top:40%; left:40%; background:radial-gradient(circle,#06b6d4,transparent 70%); animation-delay:-7s; }
+
+    @keyframes float {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(40px,30px) scale(1.1); }
+    }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .app {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 12px;
+    }
+
+    /* ============================================================
+       HEADER
+       ============================================================ */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0 12px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: var(--user-msg);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .logo-text h1 { font-size: 1.1rem; font-weight: 700; }
+    .logo-text p  { font-size: 0.72rem; color: var(--text-muted); }
+
+    .header-controls {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+
+    /* Language selector */
+    #lang-select {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      outline: none;
+      backdrop-filter: blur(8px);
+    }
+    #lang-select option { background: #1a2035; }
+
+    /* Icon buttons */
+    .icon-btn {
+      width: 38px; height: 38px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--glass);
+      color: var(--text);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      transition: background 0.2s, border-color 0.2s;
+      backdrop-filter: blur(8px);
+      position: relative;
+    }
+    .icon-btn:hover { background: var(--glass-b); border-color: var(--accent); }
+    .icon-btn.active { background: var(--accent); border-color: var(--accent); }
+    .icon-btn .tooltip {
+      position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+      background: #1a2035; color: var(--text); font-size: 0.65rem;
+      padding: 3px 7px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .icon-btn:hover .tooltip { opacity: 1; }
+
+    /* Provider pill */
+    #provider-pill {
+      font-size: 0.68rem; padding: 4px 10px;
+      border-radius: 20px; border: 1px solid var(--border);
+      background: var(--glass); color: var(--text-muted);
+      white-space: nowrap;
+    }
+    #provider-pill.ok  { border-color: var(--success); color: var(--success); }
+    #provider-pill.err { border-color: var(--warning); color: var(--warning); }
+
+    /* ============================================================
+       CHAT AREA
+       ============================================================ */
+    .chat-area {
+      overflow-y: auto;
+      padding: 20px 0 12px;
+      scroll-behavior: smooth;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .chat-area::-webkit-scrollbar { width: 4px; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Welcome screen */
+    .welcome {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px;
+      height: 100%;
+      animation: fadeUp 0.6s ease;
+    }
+    .welcome-orb {
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      background: var(--user-msg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px;
+      box-shadow: 0 0 40px rgba(79,142,247,0.4);
+      animation: pulse-orb 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse-orb {
+      0%,100% { box-shadow: 0 0 30px rgba(79,142,247,0.4); transform: scale(1); }
+      50%      { box-shadow: 0 0 60px rgba(79,142,247,0.7); transform: scale(1.05); }
+    }
+    .welcome h2 { font-size: 1.5rem; font-weight: 700; text-align: center; }
+    .welcome p  { font-size: 0.88rem; color: var(--text-muted); text-align: center; max-width: 420px; line-height: 1.6; }
+
+    .chips {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px;
+    }
+    .chip {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--glass);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      backdrop-filter: blur(8px);
+    }
+    .chip:hover { background: var(--glass-b); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+    /* Message bubbles */
+    .msg-row {
+      display: flex; gap: 10px; align-items: flex-end;
+      animation: fadeUp 0.3s ease;
+    }
+    .msg-row.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .avatar.bot { background: var(--user-msg); }
+    .avatar.user { background: rgba(255,255,255,0.1); }
+
+    .bubble {
+      max-width: 72%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      line-height: 1.6;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+    .bubble.bot {
+      background: var(--bot-msg);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      border-bottom-left-radius: 4px;
+    }
+    .bubble.user {
+      background: var(--user-msg);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble a { color: var(--accent); text-decoration: underline; }
+
+    /* Official link cards */
+    .links-section {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .links-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+      padding-left: 2px;
+    }
+    .link-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(79,142,247,0.08);
+      border: 1px solid rgba(79,142,247,0.18);
+      border-radius: 10px;
+      padding: 9px 12px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.82rem;
+      transition: all 0.18s;
+      cursor: pointer;
+    }
+    .link-card:hover {
+      background: rgba(79,142,247,0.18);
+      border-color: var(--accent);
+      transform: translateX(3px);
+    }
+    .link-card-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: rgba(79,142,247,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .link-card-text { flex: 1; }
+    .link-card-title { font-weight: 600; color: var(--text); }
+    .link-card-url   { font-size: 0.72rem; color: var(--accent); margin-top: 1px; }
+    .link-card-arrow { color: var(--text-muted); font-size: 12px; }
+
+    /* Typing indicator */
+    .typing-row {
+      display: flex; gap: 10px; align-items: flex-end;
+      animation: fadeUp 0.3s ease;
+    }
+    .typing-bubble {
+      background: var(--bot-msg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      border-bottom-left-radius: 4px;
+      padding: 14px 18px;
+      display: flex; gap: 6px; align-items: center;
+      backdrop-filter: blur(10px);
+    }
+    .typing-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); opacity:0.4; }
+      40%           { transform: translateY(-8px); opacity:1; }
+    }
+
+    /* Language detection banner */
+    #lang-banner {
+      display: none;
+      background: rgba(79,142,247,0.12);
+      border: 1px solid rgba(79,142,247,0.3);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      color: var(--accent);
+      align-items: center; gap: 8px;
+      cursor: pointer;
+      animation: fadeUp 0.3s ease;
+    }
+    #lang-banner.show { display: flex; }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ============================================================
+       INPUT BAR
+       ============================================================ */
+    .input-area {
+      padding: 12px 0 20px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .input-row {
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    #chat-input {
+      flex: 1;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      padding: 13px 16px;
+      font-size: 0.92rem;
+      font-family: 'Inter', sans-serif;
+      resize: none;
+      outline: none;
+      max-height: 140px;
+      min-height: 50px;
+      backdrop-filter: blur(10px);
+      transition: border-color 0.2s;
+    }
+    #chat-input::placeholder { color: var(--text-muted); }
+    #chat-input:focus { border-color: var(--accent); }
+
+    .mic-btn {
+      width: 50px; height: 50px; border-radius: 14px;
+      background: var(--glass); border: 1px solid var(--border);
+      color: var(--text); font-size: 22px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; flex-shrink: 0;
+      backdrop-filter: blur(10px);
+    }
+    .mic-btn:hover { background: var(--glass-b); border-color: var(--accent); }
+    .mic-btn.recording {
+      background: rgba(239,68,68,0.2);
+      border-color: #ef4444;
+      animation: mic-pulse 1s ease-in-out infinite;
+    }
+    @keyframes mic-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+      50%      { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+    }
+
+    .send-btn {
+      width: 50px; height: 50px; border-radius: 14px;
+      background: var(--user-msg);
+      border: none; color: #fff; font-size: 20px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .send-btn:hover  { opacity: 0.85; }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* Hint text */
+    .input-hint {
+      font-size: 0.72rem; color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* Voice listening overlay */
+    #voice-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(8,12,20,0.92);
+      flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    }
+    #voice-overlay.show { display: flex; }
+    .voice-orb {
+      width: 120px; height: 120px; border-radius: 50%;
+      background: radial-gradient(circle,#ef4444,#dc2626);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 50px;
+      animation: voice-pulse 1s ease-in-out infinite;
+      box-shadow: 0 0 60px rgba(239,68,68,0.6);
+    }
+    @keyframes voice-pulse {
+      0%,100% { transform: scale(1);    box-shadow: 0 0 40px rgba(239,68,68,0.5); }
+      50%      { transform: scale(1.08); box-shadow: 0 0 80px rgba(239,68,68,0.8); }
+    }
+    #voice-transcript {
+      color: var(--text); font-size: 1rem; max-width: 400px; text-align: center; min-height: 40px;
+    }
+    #voice-stop {
+      padding: 10px 28px; border-radius: 30px;
+      background: rgba(239,68,68,0.2); border: 1px solid #ef4444;
+      color: #ef4444; font-size: 0.9rem; cursor: pointer;
+    }
+
+    /* ============================================================
+       SCROLLBAR OVERRIDE
+       ============================================================ */
+    select::-webkit-scrollbar { width: 4px; }
+
+    /* ============================================================
+       SETTINGS MODAL
+       ============================================================ */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(8,12,20,0.85);
+      backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #0d1422;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      width: 90%; max-width: 440px;
+      animation: fadeUp 0.25s ease;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    .modal h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+    .modal p  { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
+    .modal label { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; }
+    .modal input {
+      width: 100%; padding: 10px 14px;
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text);
+      font-size: 0.88rem; font-family: 'Inter', sans-serif;
+      outline: none; margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal input::placeholder { color: var(--text-muted); }
+    .modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+    .btn-save {
+      flex: 1; padding: 10px;
+      background: var(--user-msg); border: none;
+      border-radius: 10px; color: #fff;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-cancel {
+      padding: 10px 18px;
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text);
+      font-size: 0.9rem; cursor: pointer;
+    }
+    .key-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; margin-bottom: 14px;
+      padding: 7px 11px; border-radius: 8px;
+      background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.25);
+      color: var(--success);
+    }
+    .key-status.none { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.25); color: var(--warning); }
+    .modal-link { color: var(--accent); font-size: 0.78rem; }
+
+    @media (max-width: 600px) {
+      .logo-text p { display: none; }
+      #provider-pill { display: none; }
+      .bubble { max-width: 88%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Animated background -->
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<!-- ── SETTINGS MODAL ─────────────────────────────────── -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ API Key Settings</h2>
+    <p>
+      Your key is stored only in your browser (localStorage) and sent directly
+      to the AI provider. It is <strong>never saved on any server</strong>.
+      Get a free key at <a class="modal-link" href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>.
+    </p>
+    <div id="key-status-banner" class="key-status none">⚠️ No API key set — enter one below</div>
+    <label for="input-gemini-key">Google Gemini API Key <span style="color:var(--success)">(recommended, free)</span></label>
+    <input id="input-gemini-key" type="password" placeholder="AIzaSy..." autocomplete="off" />
+    <label for="input-groq-key">Groq API Key <span style="color:var(--text-muted)">(optional fallback)</span></label>
+    <input id="input-groq-key" type="password" placeholder="gsk_..." autocomplete="off" />
+    <div class="modal-actions">
+      <button class="btn-save" onclick="saveSettings()">Save &amp; Close</button>
+      <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Voice overlay -->
+<div id="voice-overlay">
+  <div class="voice-orb">🎤</div>
+  <div id="voice-transcript">Listening…</div>
+  <button id="voice-stop" onclick="stopListening()">Stop</button>
+</div>
+
+<!-- App shell -->
+<div class="app">
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🏛️</div>
+      <div class="logo-text">
+        <h1>Beuro AI</h1>
+        <p>Government Service Autopilot</p>
+      </div>
+    </div>
+    <div class="header-controls">
+      <span id="provider-pill" class="err">⏳ Checking…</span>
+
+      <!-- Language selector -->
+      <select id="lang-select" title="Select language" onchange="onLangChange(this.value)">
+        <option value="en">🇬🇧 English</option>
+        <option value="hi">🇮🇳 हिन्दी</option>
+        <option value="ta">🇮🇳 தமிழ்</option>
+        <option value="te">🇮🇳 తెలుగు</option>
+        <option value="bn">🇮🇳 বাংলা</option>
+        <option value="mr">🇮🇳 मराठी</option>
+        <option value="gu">🇮🇳 ગુજરાતી</option>
+        <option value="kn">🇮🇳 ಕನ್ನಡ</option>
+        <option value="ml">🇮🇳 മലയാളം</option>
+        <option value="pa">🇮🇳 ਪੰਜਾਬੀ</option>
+        <option value="ur">🇵🇰 اردو</option>
+      </select>
+
+      <!-- Text-to-speech toggle -->
+      <button class="icon-btn" id="tts-btn" onclick="toggleTTS()" title="Text-to-speech">
+        🔊
+        <span class="tooltip">Toggle voice</span>
+      </button>
+
+      <!-- Settings -->
+      <button class="icon-btn" id="settings-btn" onclick="openSettings()" title="Settings">
+        ⚙️
+        <span class="tooltip">API Key Settings</span>
+      </button>
+
+      <!-- Clear chat -->
+      <button class="icon-btn" onclick="clearChat()" title="Clear chat">
+        🗑️
+        <span class="tooltip">Clear chat</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- CHAT AREA -->
+  <div class="chat-area" id="chat-area">
+
+    <!-- Language detected banner -->
+    <div id="lang-banner" onclick="acceptDetectedLang()">
+      <span id="lang-banner-text">Language detected: Hindi — switch?</span>
+      <strong>Yes ✓</strong>
+    </div>
+
+    <!-- Welcome screen (hidden after first message) -->
+    <div class="welcome" id="welcome-screen">
+      <div class="welcome-orb">🏛️</div>
+      <h2>Namaste! How can I help?</h2>
+      <p>I guide you step-by-step through Indian government services — passport, Aadhaar, birth certificate, PAN card and more.</p>
+      <div class="chips">
+        <div class="chip" onclick="sendChip('I want to apply for a Passport')">🛂 Passport</div>
+        <div class="chip" onclick="sendChip('How do I update my Aadhaar card?')">🪪 Aadhaar Update</div>
+        <div class="chip" onclick="sendChip('I need a Birth Certificate')">📄 Birth Certificate</div>
+        <div class="chip" onclick="sendChip('I need to apply for a PAN card')">💳 PAN Card</div>
+        <div class="chip" onclick="sendChip('How to register a vehicle?')">🚗 Vehicle RC</div>
+        <div class="chip" onclick="sendChip('I want to file a police complaint')">👮 Police Complaint</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT BAR -->
+  <div class="input-area">
+    <div id="lang-banner" style="display:none"></div>
+    <div class="input-row">
+      <!-- Mic button -->
+      <button class="mic-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input">🎤</button>
+
+      <!-- Text input -->
+      <textarea
+        id="chat-input"
+        rows="1"
+        placeholder="Type your question or press 🎤 to speak…"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+
+      <!-- Send button -->
+      <button class="send-btn" id="send-btn" onclick="sendMessage()" title="Send">➤</button>
+    </div>
+    <div class="input-hint">Press Enter to send · Shift+Enter for new line · 🎤 for voice</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+  const API = 'http://127.0.0.1:8000/api';
+  let sessionId   = localStorage.getItem('buro_session') || crypto.randomUUID();
+  let currentLang = localStorage.getItem('buro_lang') || 'en';
+  let ttsEnabled  = localStorage.getItem('buro_tts') !== 'false';
+  let geminiKey   = localStorage.getItem('buro_gemini_key') || '';
+  let groqKey     = localStorage.getItem('buro_groq_key')   || '';
+  let recognition = null;
+  let isListening = false;
+  let detectedLang = null;
+  let firstMsg    = true;
+
+  // Persist session ID
+  localStorage.setItem('buro_session', sessionId);
+
+  // Init
+  document.getElementById('lang-select').value = currentLang;
+  updateTTSBtn();
+  checkProvider();
+  updateSettingsBtn();
+
+  // Auto-open settings if no key is saved yet
+  if (!geminiKey && !groqKey) {
+    setTimeout(openSettings, 600);
+  }
+
+  // ──────────────────────────────────────────────
+  // SETTINGS MODAL
+  // ──────────────────────────────────────────────
+  function openSettings() {
+    document.getElementById('input-gemini-key').value = geminiKey;
+    document.getElementById('input-groq-key').value   = groqKey;
+    const banner = document.getElementById('key-status-banner');
+    if (geminiKey || groqKey) {
+      banner.textContent = '✅ API key is set — you can update it below';
+      banner.className = 'key-status';
+    } else {
+      banner.textContent = '⚠️ No API key set — enter one below';
+      banner.className = 'key-status none';
+    }
+    document.getElementById('settings-modal').classList.add('show');
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-modal').classList.remove('show');
+  }
+
+  function saveSettings() {
+    geminiKey = document.getElementById('input-gemini-key').value.trim();
+    groqKey   = document.getElementById('input-groq-key').value.trim();
+    localStorage.setItem('buro_gemini_key', geminiKey);
+    localStorage.setItem('buro_groq_key',   groqKey);
+    closeSettings();
+    updateSettingsBtn();
+    checkProvider();
+  }
+
+  function updateSettingsBtn() {
+    const btn = document.getElementById('settings-btn');
+    btn.classList.toggle('active', !!(geminiKey || groqKey));
+  }
+
+  // Close modal on overlay click
+  document.getElementById('settings-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'settings-modal') closeSettings();
+  });
+
+  // ──────────────────────────────────────────────
+  // PROVIDER HEALTH CHECK
+  // ──────────────────────────────────────────────
+  async function checkProvider() {
+    const pill = document.getElementById('provider-pill');
+    try {
+      const r = await fetch(`${API}/health`);
+      const d = await r.json();
+      const p = d.active_provider || '';
+      pill.textContent = '● ' + p;
+      pill.className = p.includes('No provider') ? 'err' : 'ok';
+    } catch {
+      pill.textContent = '● Offline';
+      pill.className = 'err';
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // AUTO-RESIZE TEXTAREA
+  // ──────────────────────────────────────────────
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // QUICK-CHIP SENDER
+  // ──────────────────────────────────────────────
+  function sendChip(text) {
+    document.getElementById('chat-input').value = text;
+    sendMessage();
+  }
+
+  // ──────────────────────────────────────────────
+  // SEND MESSAGE
+  // ──────────────────────────────────────────────
+  async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const text  = input.value.trim();
+    if (!text) return;
+
+    // Hide welcome screen
+    if (firstMsg) {
+      document.getElementById('welcome-screen').style.display = 'none';
+      firstMsg = false;
+    }
+
+    input.value = '';
+    input.style.height = 'auto';
+
+    appendUserMsg(text);
+    const typingId = showTyping();
+    document.getElementById('send-btn').disabled = true;
+
+    // Auto-detect language (simple heuristic based on Unicode ranges)
+    detectLanguage(text);
+
+    try {
+      const topic = currentTopic(text);
+      const res = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          message: text,
+          session_id: sessionId,
+          language: currentLang,
+          gemini_key: geminiKey,
+          groq_key: groqKey,
+        }),
+      });
+      const data = await res.json();
+      removeTyping(typingId);
+      const reply = data.reply || 'I could not process your request. Please try again.';
+      const steps = data.steps || [];
+      appendBotMsg(reply, steps);
+      if (ttsEnabled) speak(reply);
+      // Refresh provider status after response
+      checkProvider();
+    } catch (err) {
+      removeTyping(typingId);
+      appendBotMsg('⚠️ Could not reach the backend. Make sure the server is running on port 8000.', []);
+    }
+
+    document.getElementById('send-btn').disabled = false;
+  }
+
+  // Very simple topic extractor from user text
+  function currentTopic(text) {
+    const t = text.toLowerCase();
+    if (t.includes('passport'))   return 'passport';
+    if (t.includes('aadhaar') || t.includes('aadhar')) return 'aadhaar';
+    if (t.includes('birth'))      return 'birth_certificate';
+    if (t.includes('pan'))        return 'pan_card';
+    if (t.includes('vehicle') || t.includes(' rc ')) return 'vehicle_rc';
+    if (t.includes('police') || t.includes('fir'))   return 'police_complaint';
+    if (t.includes('ration'))     return 'ration_card';
+    if (t.includes('voter'))      return 'voter_id';
+    if (t.includes('driving') || t.includes('licence')) return 'driving_licence';
+    return 'general';
+  }
+
+  // ──────────────────────────────────────────────
+  // APPEND MESSAGES
+  // ──────────────────────────────────────────────
+  function appendUserMsg(text) {
+    const area = document.getElementById('chat-area');
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `
+      <div class="avatar user">👤</div>
+      <div class="bubble user">${escHtml(text)}</div>`;
+    area.appendChild(row);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function appendBotMsg(rawText, steps = []) {
+    const area = document.getElementById('chat-area');
+    const row  = document.createElement('div');
+    row.className = 'msg-row';
+
+    // Build link cards HTML
+    let linksHtml = '';
+    if (steps && steps.length > 0) {
+      const icons = ['🌐','📋','📅','🔍','📲','💻','📁','🏛️','📞','🔗'];
+      const cards = steps.map((s, i) => {
+        const icon = icons[i % icons.length];
+        const domain = (() => { try { return new URL(s.url).hostname; } catch { return s.url; } })();
+        return `<a class="link-card" href="${escAttr(s.url)}" target="_blank" rel="noopener">
+          <div class="link-card-icon">${icon}</div>
+          <div class="link-card-text">
+            <div class="link-card-title">${escHtml(s.title)}</div>
+            <div class="link-card-url">${escHtml(domain)}</div>
+          </div>
+          <div class="link-card-arrow">↗</div>
+        </a>`;
+      }).join('');
+      linksHtml = `<div class="links-section"><div class="links-label">📎 Official Links</div>${cards}</div>`;
+    }
+
+    const html = renderBotContent(rawText);
+    row.innerHTML = `
+      <div class="avatar bot">🏛️</div>
+      <div class="bubble bot" style="max-width:80%">${html}${linksHtml}</div>`;
+    area.appendChild(row);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function escAttr(str) {
+    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Render bot text – convert plain text links to anchors, bold, lists
+  function renderBotContent(text) {
+    let h = escHtml(text);
+    // URLs → links
+    h = h.replace(/(https?:\/\/[^\s<>"]+)/g,
+      '<a href="$1" target="_blank" rel="noopener" style="color:var(--accent)">$1</a>');
+    // **bold**
+    h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Numbered steps — render as styled step pills
+    h = h.replace(/^(Step\s+)?(\d+)[.:\))]\s+(.+)$/gm, (_, _pre, num, rest) =>
+      `<div style="display:flex;gap:8px;align-items:flex-start;margin:6px 0">
+        <span style="background:var(--accent);color:#fff;border-radius:50%;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">${num}</span>
+        <span>${rest}</span>
+      </div>`);
+    // Bullet points
+    h = h.replace(/^[-•]\s+(.+)$/gm, '<li style="margin:3px 0">$1</li>');
+    h = h.replace(/(<li.*<\/li>)/s, '<ul style="padding-left:1.4em;margin:6px 0">$1</ul>');
+    // Line breaks
+    h = h.replace(/\n/g, '<br>');
+    return h;
+  }
+
+  function escHtml(str) {
+    return str
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ──────────────────────────────────────────────
+  // TYPING INDICATOR
+  // ──────────────────────────────────────────────
+  function showTyping() {
+    const area = document.getElementById('chat-area');
+    const id   = 'typing-' + Date.now();
+    const row  = document.createElement('div');
+    row.id = id;
+    row.className = 'typing-row';
+    row.innerHTML = `
+      <div class="avatar bot">🏛️</div>
+      <div class="typing-bubble">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>`;
+    area.appendChild(row);
+    area.scrollTop = area.scrollHeight;
+    return id;
+  }
+  function removeTyping(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  // ──────────────────────────────────────────────
+  // LANGUAGE DETECTION (Unicode block heuristic)
+  // ──────────────────────────────────────────────
+  const LANG_RANGES = [
+    { lang:'hi', code:'hi', name:'Hindi',    re: /[\u0900-\u097F]/ },
+    { lang:'ta', code:'ta', name:'Tamil',    re: /[\u0B80-\u0BFF]/ },
+    { lang:'te', code:'te', name:'Telugu',   re: /[\u0C00-\u0C7F]/ },
+    { lang:'bn', code:'bn', name:'Bengali',  re: /[\u0980-\u09FF]/ },
+    { lang:'gu', code:'gu', name:'Gujarati', re: /[\u0A80-\u0AFF]/ },
+    { lang:'kn', code:'kn', name:'Kannada',  re: /[\u0C80-\u0CFF]/ },
+    { lang:'ml', code:'ml', name:'Malayalam',re: /[\u0D00-\u0D7F]/ },
+    { lang:'pa', code:'pa', name:'Punjabi',  re: /[\u0A00-\u0A7F]/ },
+    { lang:'mr', code:'mr', name:'Marathi',  re: /[\u0900-\u097F]/ },
+    { lang:'ur', code:'ur', name:'Urdu',     re: /[\u0600-\u06FF]/ },
+  ];
+
+  function detectLanguage(text) {
+    for (const l of LANG_RANGES) {
+      if (l.re.test(text) && l.code !== currentLang) {
+        showLangBanner(l);
+        return;
+      }
+    }
+  }
+
+  function showLangBanner(l) {
+    detectedLang = l.code;
+    const banner = document.getElementById('lang-banner');
+    document.getElementById('lang-banner-text').textContent =
+      `Detected: ${l.name} — switch to it?`;
+    banner.className = 'show';
+    banner.style.display = 'flex';
+  }
+
+  function acceptDetectedLang() {
+    if (detectedLang) {
+      currentLang = detectedLang;
+      localStorage.setItem('buro_lang', currentLang);
+      document.getElementById('lang-select').value = currentLang;
+    }
+    document.getElementById('lang-banner').style.display = 'none';
+  }
+
+  function onLangChange(val) {
+    currentLang = val;
+    localStorage.setItem('buro_lang', val);
+  }
+
+  // ──────────────────────────────────────────────
+  // VOICE INPUT (Web Speech API)
+  // ──────────────────────────────────────────────
+  function toggleVoice() {
+    if (isListening) stopListening();
+    else             startListening();
+  }
+
+  function startListening() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      alert('Voice input is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+    recognition = new SpeechRec();
+    recognition.continuous  = false;
+    recognition.interimResults = true;
+    recognition.lang = getLangBCP47(currentLang);
+
+    const overlay = document.getElementById('voice-overlay');
+    const transcript = document.getElementById('voice-transcript');
+    const micBtn = document.getElementById('mic-btn');
+
+    overlay.classList.add('show');
+    micBtn.classList.add('recording');
+    isListening = true;
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final   = '';
+      for (const r of e.results) {
+        if (r.isFinal) final   += r[0].transcript;
+        else           interim += r[0].transcript;
+      }
+      transcript.textContent = final || interim || 'Listening…';
+      if (final) {
+        document.getElementById('chat-input').value = final;
+      }
+    };
+    recognition.onerror = recognition.onend = () => stopListening();
+    recognition.start();
+  }
+
+  function stopListening() {
+    if (recognition) { try { recognition.stop(); } catch {} }
+    document.getElementById('voice-overlay').classList.remove('show');
+    document.getElementById('mic-btn').classList.remove('recording');
+    isListening = false;
+
+    // Auto-send if there's captured text
+    const input = document.getElementById('chat-input');
+    if (input.value.trim()) sendMessage();
+  }
+
+  // Map our lang codes to BCP-47 codes for SpeechRecognition
+  function getLangBCP47(code) {
+    const map = {
+      en:'en-IN', hi:'hi-IN', ta:'ta-IN', te:'te-IN', bn:'bn-IN',
+      mr:'mr-IN', gu:'gu-IN', kn:'kn-IN', ml:'ml-IN', pa:'pa-IN', ur:'ur-PK',
+    };
+    return map[code] || 'en-IN';
+  }
+
+  // ──────────────────────────────────────────────
+  // TEXT-TO-SPEECH (Web Speech API)
+  // ──────────────────────────────────────────────
+  function toggleTTS() {
+    ttsEnabled = !ttsEnabled;
+    localStorage.setItem('buro_tts', ttsEnabled);
+    updateTTSBtn();
+    if (!ttsEnabled) speechSynthesis.cancel();
+  }
+
+  function updateTTSBtn() {
+    const btn = document.getElementById('tts-btn');
+    btn.textContent = ttsEnabled ? '🔊' : '🔇';
+    btn.classList.toggle('active', ttsEnabled);
+  }
+
+  // ── TTS keepalive: Chrome kills speechSynthesis after ~15s ──────
+  let _ttsKeepAlive = null;
+  let _voices = [];
+
+  // Pre-load voices (Chrome loads them async)
+  function _loadVoices() {
+    _voices = speechSynthesis.getVoices();
+  }
+  _loadVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = _loadVoices;
+  }
+
+  // BCP-47 to human name for warning messages
+  const LANG_DISPLAY = {
+    'hi-IN': 'Hindi', 'ta-IN': 'Tamil', 'te-IN': 'Telugu',
+    'bn-IN': 'Bengali', 'mr-IN': 'Marathi', 'gu-IN': 'Gujarati',
+    'kn-IN': 'Kannada', 'ml-IN': 'Malayalam', 'pa-IN': 'Punjabi',
+    'ur-PK': 'Urdu', 'en-IN': 'English',
+  };
+
+  /**
+   * Find the best available voice for a BCP-47 lang code.
+   * Priority: exact match → language prefix match → any en-IN/en → first voice
+   */
+  function _pickVoice(bcp47) {
+    if (!_voices.length) _voices = speechSynthesis.getVoices();
+    const lang = bcp47.toLowerCase();
+    const prefix = lang.split('-')[0]; // e.g. "hi" from "hi-IN"
+
+    // 1. Exact match (e.g. "hi-IN")
+    let v = _voices.find(v => v.lang.toLowerCase() === lang);
+    if (v) return { voice: v, fallback: false };
+
+    // 2. Language prefix match (e.g. any voice starting with "hi")
+    v = _voices.find(v => v.lang.toLowerCase().startsWith(prefix));
+    if (v) return { voice: v, fallback: false };
+
+    // 3. English Indian fallback
+    v = _voices.find(v => v.lang.toLowerCase() === 'en-in')
+      || _voices.find(v => v.lang.toLowerCase().startsWith('en'));
+    if (v) return { voice: v, fallback: true };
+
+    // 4. Whatever is available
+    return { voice: _voices[0] || null, fallback: true };
+  }
+
+  function _startKeepAlive() {
+    _stopKeepAlive();
+    _ttsKeepAlive = setInterval(() => {
+      if (speechSynthesis.speaking && !speechSynthesis.paused) {
+        speechSynthesis.pause();
+        setTimeout(() => speechSynthesis.resume(), 50);
+      } else if (!speechSynthesis.speaking) {
+        _stopKeepAlive();
+      }
+    }, 10000);
+  }
+
+  function _stopKeepAlive() {
+    if (_ttsKeepAlive) { clearInterval(_ttsKeepAlive); _ttsKeepAlive = null; }
+  }
+
+  function speak(text) {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    _stopKeepAlive();
+
+    // Strip markdown / URLs for clean audio
+    const clean = text
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/[*_`#\[\]()\u003e↗➤•→]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!clean) return;
+
+    const bcp47 = getLangBCP47(currentLang);
+    const { voice, fallback } = _pickVoice(bcp47);
+    const langName = LANG_DISPLAY[bcp47] || bcp47;
+
+    // Warn user if no native voice found for their language
+    if (fallback && currentLang !== 'en') {
+      console.warn(`[TTS] No ${langName} voice found. Using fallback: ${voice?.name || 'default'}. Install ${langName} voice in System Settings → Accessibility → Spoken Content → Manage Voices.`);
+      // Show a subtle one-time toast in the UI
+      _showTTSWarning(langName);
+    } else if (voice) {
+      console.log(`[TTS] Using voice: ${voice.name} (${voice.lang})`);
+    }
+
+    // Split into sentence chunks to avoid Chrome's 15s cutoff
+    const sentences = clean.match(/[^.!?\n]{1,220}[.!?\n]?/g) || [clean];
+    let idx = 0;
+
+    function speakNext() {
+      if (idx >= sentences.length || !ttsEnabled) {
+        _stopKeepAlive();
+        return;
+      }
+      const chunk = sentences[idx++].trim();
+      if (!chunk) { speakNext(); return; }
+
+      const utt = new SpeechSynthesisUtterance(chunk);
+      if (voice) utt.voice = voice;
+      utt.lang  = voice ? voice.lang : bcp47;
+      utt.rate  = currentLang === 'en' ? 0.95 : 0.88; // Slightly slower for non-Latin scripts
+      utt.pitch = 1;
+      utt.onend   = speakNext;
+      utt.onerror = (e) => { if (e.error !== 'interrupted') speakNext(); };
+      speechSynthesis.speak(utt);
+    }
+
+    speakNext();
+    _startKeepAlive();
+  }
+
+  // Toast warning shown once per language switch
+  let _ttsWarnedLang = '';
+  function _showTTSWarning(langName) {
+    if (_ttsWarnedLang === langName) return;
+    _ttsWarnedLang = langName;
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+      background:#1a2035; border:1px solid rgba(251,191,36,0.4);
+      color:#fbbf24; padding:10px 18px; border-radius:10px;
+      font-size:0.78rem; z-index:300; text-align:center;
+      animation:fadeUp 0.3s ease; max-width:340px; line-height:1.5;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    `;
+    toast.innerHTML = `🔊 No <strong>${langName}</strong> voice installed on this device.<br>
+      Reading in English. Install voices via<br>
+      <em>System Settings → Accessibility → Spoken Content → Manage Voices</em>.`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
+  }
+
+  // ──────────────────────────────────────────────
+  // CLEAR CHAT
+  // ──────────────────────────────────────────────
+  function clearChat() {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem('buro_session', sessionId);
+    firstMsg = true;
+    const area = document.getElementById('chat-area');
+    // Remove all msg rows
+    area.querySelectorAll('.msg-row, .typing-row').forEach(el => el.remove());
+    // Show welcome again
+    document.getElementById('welcome-screen').style.display = '';
+    speechSynthesis.cancel();
+  }
+</script>
+</body>
+</html>
